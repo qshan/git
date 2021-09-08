@@ -313,6 +313,12 @@ static int reset_head(void)
 	return run_command(&cp);
 }
 
+static int is_path_a_directory(const char *path)
+{
+	struct stat st;
+	return (!lstat(path, &st) && S_ISDIR(st.st_mode));
+}
+
 static void add_diff_to_buf(struct diff_queue_struct *q,
 			    struct diff_options *options,
 			    void *data)
@@ -320,6 +326,9 @@ static void add_diff_to_buf(struct diff_queue_struct *q,
 	int i;
 
 	for (i = 0; i < q->nr; i++) {
+		if (is_path_a_directory(q->queue[i]->one->path))
+			continue;
+
 		strbuf_addstr(data, q->queue[i]->one->path);
 
 		/* NUL-terminate: will be fed to update-index -z */
@@ -521,9 +530,6 @@ static int do_apply_stash(const char *prefix, struct stash_info *info,
 		}
 	}
 
-	if (info->has_u && restore_untracked(&info->u_tree))
-		return error(_("could not restore untracked files from stash"));
-
 	init_merge_options(&o, the_repository);
 
 	o.branch1 = "Updated upstream";
@@ -557,6 +563,9 @@ static int do_apply_stash(const char *prefix, struct stash_info *info,
 	} else {
 		unstage_changes_unless_new(&c_tree);
 	}
+
+	if (info->has_u && restore_untracked(&info->u_tree))
+		return error(_("could not restore untracked files from stash"));
 
 	if (!quiet) {
 		struct child_process cp = CHILD_PROCESS_INIT;
